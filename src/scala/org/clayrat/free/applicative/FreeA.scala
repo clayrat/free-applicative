@@ -17,12 +17,12 @@ sealed abstract class FreeA[F[+ _], +A] {
 
   def map[B](f: A => B): FreeA[F, B] = this match {
     case Pure(a) => Pure(f(a))
-    case Ap(fa, apf) => Ap(fa, apf map (f compose _))
+    case Ap(fa: F[A], apf) => Ap(fa, apf map (f compose _))
   }
 
   def <*>[B](freeA: FreeA[F, A => B]): FreeA[F, B] = this match {
     case Pure(a) => freeA map (_(a))
-    case Ap(fa, apf) => {
+    case Ap(fa: F[A], apf) => {
       val fAB: FreeA[F, (Any => A) => (Any => B)] = freeA map (x => x.compose _)
       Ap(fa, apf <*> fAB)
     }
@@ -31,13 +31,13 @@ sealed abstract class FreeA[F[+ _], +A] {
   def run[B, G[+ _] : Applicative](u: F[B] => G[B]): G[A] =
     this match {
       case Pure(x) => Applicative[G].pure(x)
-      case Ap(f, x) => u(f) <*> x.run(u)
+      case Ap(f: F[B], x) => u(f) <*> x.run(u)
     }
 
   def hoistAp[F[+ _] : Functor, G[+ _] : Functor, B](f: F[B] => G[B]): FreeA[G, A] =
     this match {
       case Pure(a) => Pure(a)
-      case Ap(x, y) => Ap(f(x), y.hoistAp(f))
+      case Ap(x: F[B], y) => Ap(f(x), y.hoistAp(f))
     }
 
 }
