@@ -1,4 +1,4 @@
-package org.clayrat.free.applicative
+package free.applicative
 
 import scalaz._
 import syntax.applicative._
