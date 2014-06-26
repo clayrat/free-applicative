@@ -31,7 +31,7 @@ sealed abstract class FreeA[F[+ _], +A] {
   def run[B, G[+ _] : Applicative](u: F[B] => G[B]): G[A] =
     this match {
       case Pure(x) => Applicative[G].pure(x)
-      case Ap(f: F[B], x) => u(f) <*> x.run(u)
+      case Ap(f: F[B], x: FreeA[F, B => A]) => u(f) <*> x.run(u)
     }
 
   def hoistAp[F[+ _] : Functor, G[+ _] : Functor, B](f: F[B] => G[B]): FreeA[G, A] =
