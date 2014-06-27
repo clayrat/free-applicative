@@ -20,9 +20,6 @@ object OptParser {
 
   def parserDefault[A](fa: FreeA[OptParser, A]): Option[A] = fa.run { x: OptParser[A] => x.optDefault}
 
-
-  type CL[A] = Const[List[String], A]
-
   def allOptions[A](fa: FreeA[OptParser, A]): List[String] = {
     /*  this fails with "could not find implicit value for evidence parameter of type scalaz.Applicative[G]" for Const
         I suspect it's due to Scala's inability to infer type lambdas
@@ -64,7 +61,7 @@ object OptParser {
       catching(classOf[NumberFormatException]) opt str.toInt
     }
 
-    val userP: FreeA[OptParser, User] =
+    val userP =
       liftFreeA(OptParser("id", None, readInt)) <*> (
         liftFreeA(OptParser("fullname", Some(""), Some(_))) <*> (
           liftFreeA(OptParser("username", None, Some(_))) map User.curried

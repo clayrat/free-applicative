@@ -8,7 +8,6 @@ import FreeA._
 object FreeA extends FreeAInstances with FreeAFunctions {
 
   case class Pure[F[+ _], +A](a: A) extends FreeA[F, A]
-
   case class Ap[F[+ _], A, +B](fa: F[A], apf: FreeA[F, A => B]) extends FreeA[F, B]
 
 }
@@ -22,10 +21,9 @@ sealed abstract class FreeA[F[+ _], +A] {
 
   def <*>[B](freeA: FreeA[F, A => B]): FreeA[F, B] = this match {
     case Pure(a) => freeA map (_(a))
-    case Ap(fa: F[A], apf) => {
+    case Ap(fa: F[A], apf) =>
       val fAB: FreeA[F, (Any => A) => (Any => B)] = freeA map (x => x.compose _)
       Ap(fa, apf <*> fAB)
-    }
   }
 
   def run[B, G[+ _] : Applicative](u: F[B] => G[B]): G[A] =
@@ -34,7 +32,7 @@ sealed abstract class FreeA[F[+ _], +A] {
       case Ap(f: F[B], x: FreeA[F, B => A]) => u(f) <*> x.run(u)
     }
 
-  def hoistAp[F[+ _] : Functor, G[+ _] : Functor, B](f: F[B] => G[B]): FreeA[G, A] =
+  def hoistAp[B, G[+ _] : Functor](f: F[B] => G[B]): FreeA[G, A] =
     this match {
       case Pure(a) => Pure(a)
       case Ap(x: F[B], y) => Ap(f(x), y.hoistAp(f))
