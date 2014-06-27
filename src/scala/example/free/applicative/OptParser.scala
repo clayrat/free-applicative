@@ -42,8 +42,7 @@ object OptParser {
 
   def matchOpt[A](opt: String, value: String, fa: FreeA[OptParser, A]): Option[FreeA[OptParser, A]] = fa match {
     case Pure(_) => None
-    case Ap(x: OptParser[A], g: FreeA[OptParser, Any => A]) if opt == s"--${x.optName}" =>
-      x.optReader(value) map { y: A => g map { f: (Any => A) => f(y)}}
+    case Ap(x, g) if opt == s"--${x.optName}" => x.optReader(value) map { y => g map { f => f(y)}}
     case Ap(x, g) => matchOpt(opt, value, g) map (Ap(x, _))
   }
 
