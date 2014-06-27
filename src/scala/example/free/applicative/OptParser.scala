@@ -5,11 +5,7 @@ import free.applicative.FreeA
 import scalaz._
 import Scalaz._
 
-import scalaz.Const._
-
-case class OptParser[+A](optName: String, optDefault: Option[A], optReader: String => Option[A]) {
-
-}
+case class OptParser[+A](optName: String, optDefault: Option[A], optReader: String => Option[A])
 
 object OptParser {
 
@@ -24,27 +20,41 @@ object OptParser {
 
   def parserDefault[A](fa: FreeA[OptParser, A]): Option[A] = fa.run { x: OptParser[A] => x.optDefault}
 
+
+  type CL[A] = Const[List[String], A]
+
   def allOptions[A](fa: FreeA[OptParser, A]): List[String] = {
-//    fa.run { x: OptParser[A] => Const[List[String], A](List(x.optName))}
-//      .getConst
+    /*  this fails with "could not find implicit value for evidence parameter of type scalaz.Applicative[G]" for Const
+        I suspect it's due to Scala's inability to infer type lambdas
+     */
+    //    fa.run { x: OptParser[X] => Const[List[String], X](List(x.optName))}
+    //      .getConst
 
-      def f[Y](opt: OptParser[Y]) = Const[List[String],Y](List(opt.optName))
-      def helper[X](fa: FreeA[OptParser, X]): Const[List[String], X] = fa match {
-        case Pure(x) => Const[List[String],X](Nil)
-        case Ap(x: OptParser[X], g) =>
-          val hg: Const[List[String],X => X] = helper(g)
-          f(x) <*> hg
-      }
-      helper(fa).getConst
+    def f[X](opt: OptParser[X]) = Const[List[String], X](List(opt.optName))
+    def helper[X](fa: FreeA[OptParser, X]): Const[List[String], X] = fa match {
+      case Pure(x) => Const[List[String], X](Nil)
+      case Ap(x: OptParser[X], g) =>
+        val hg: Const[List[String], X => X] = helper(g)
+        f(x) <*> hg
     }
+    helper(fa).getConst
+  }
 
-  //  def matchOpt[A, B](opt: String, value: String, fa: FreeA[OptParser, A]): Option[FreeA[OptParser, A]] = fa match {
-  //    case Pure(_) => None
-  //    case Ap(x, g: FreeA[OptParser, Any => A]) if opt == s"--${x.optName}" =>
-  //      val pure = x.optReader(value)
-  //      pure map
-  //    case Ap(x, g: FreeA[OptParser, A => B]) => matchOpt(opt, value, g)
-  //  }
+  def matchOpt[A](opt: String, value: String, fa: FreeA[OptParser, A]): Option[FreeA[OptParser, A]] = fa match {
+    case Pure(_) => None
+    case Ap(x: OptParser[A], g: FreeA[OptParser, Any => A]) if opt == s"--${x.optName}" =>
+      x.optReader(value) map { y: A => g map { f: (Any => A) => f(y)}}
+    case Ap(x, g) => matchOpt(opt, value, g) map (Ap(x, _))
+  }
+
+  def runParser[A](fa: FreeA[OptParser, A], ops: List[String]): Option[A] = ops match {
+    case opt :: value :: args => matchOpt(opt, value, fa) match {
+      case None => None
+      case Some(fp) => runParser(fp, args)
+    }
+    case Nil => parserDefault(fa)
+    case _ => None
+  }
 
   def main(args: Array[String]) {
 
@@ -62,7 +72,14 @@ object OptParser {
           )
         )
 
-    println(allOptions(userP))
+    val parsed = runParser(userP, List(
+      "--id", "1",
+      "--fullname", "Adam",
+      "--username", "mada")
+    )
+
+    println(parsed)
+
 
   }
 
