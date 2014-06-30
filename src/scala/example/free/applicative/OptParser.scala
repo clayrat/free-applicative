@@ -20,26 +20,12 @@ object OptParser {
 
   def parserDefault[A](fa: FreeA[OptParser, A]): Option[A] = fa.run { x: OptParser[A] => x.optDefault}
 
-  def allOptions[A](fa: FreeA[OptParser, A]): List[String] = {
-    /*  this fails with "could not find implicit value for evidence parameter of type scalaz.Applicative[G]" for Const
-        I suspect it's due to Scala's inability to infer type lambdas
-     */
-    //    fa.run { x: OptParser[X] => Const[List[String], X](List(x.optName))}
-    //      .getConst
-
-    def f[X](opt: OptParser[X]) = Const[List[String], X](List(opt.optName))
-    def helper[X](fa: FreeA[OptParser, X]): Const[List[String], X] = fa match {
-      case Pure(x) => Const[List[String], X](Nil)
-      case Ap(x: OptParser[X], g) =>
-        val hg: Const[List[String], X => X] = helper(g)
-        f(x) <*> hg
-    }
-    helper(fa).getConst
-  }
+  def allOptions[A](fa: FreeA[OptParser, A]): List[String] =
+    fa.run[A, ({type λ[+α] = Const[List[String], α]})#λ] { x => Const(List(x.optName))}.getConst
 
   def matchOpt[A](opt: String, value: String, fa: FreeA[OptParser, A]): Option[FreeA[OptParser, A]] = fa match {
     case Pure(_) => None
-    case Ap(x, g) if opt == s"--${x.optName}" => x.optReader(value) map { y => g map { f => f(y)}}
+    case Ap(x, g) if opt == s"--${x.optName}" => x.optReader(value) map (y => g map (f => f(y)))
     case Ap(x, g) => matchOpt(opt, value, g) map (Ap(x, _))
   }
 
@@ -57,25 +43,23 @@ object OptParser {
     case class User(username: String, fullname: String, id: Int)
 
     def readInt(str: String): Option[Int] = {
+
       import scala.util.control.Exception._
+
       catching(classOf[NumberFormatException]) opt str.toInt
     }
 
-    val userP =
+    val userParser =
       liftFreeA(OptParser("id", None, readInt)) <*> (
         liftFreeA(OptParser("fullname", Some(""), Some(_))) <*> (
           liftFreeA(OptParser("username", None, Some(_))) map User.curried
           )
         )
 
-    val parsed = runParser(userP, List(
-      "--id", "1",
-      "--fullname", "Adam",
-      "--username", "mada")
-    )
+    println(allOptions(userParser))
 
+    val parsed = runParser(userParser, "--id 1 --fullname Adam --username mada".split(" ").toList)
     println(parsed)
-
 
   }
 
